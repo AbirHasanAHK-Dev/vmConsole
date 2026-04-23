@@ -2,32 +2,6 @@ name: Build vmConsole APK
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/build-apk.yml
-      - app/**
-      - external/alpine_iso/**
-      - external/libvmc/**
-      - gradle/**
-      - gradle.properties
-      - settings.gradle
-      - build.gradle
-      - gradlew
-      - gradlew.bat
-  pull_request:
-    paths:
-      - .github/workflows/build-apk.yml
-      - app/**
-      - external/alpine_iso/**
-      - external/libvmc/**
-      - gradle/**
-      - gradle.properties
-      - settings.gradle
-      - build.gradle
-      - gradlew
-      - gradlew.bat
 
 jobs:
   build-debug-apk:
