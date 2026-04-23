@@ -24,6 +24,7 @@
     <string name="menu_configure_ports">Configure ports</string>
     <string name="menu_configure_display">Display mode</string>
     <string name="menu_autofill_pw">Autofill password</string>
+    <string name="menu_autOFILL_PW">Autofill password</string>
     <string name="menu_select_urls">Select URLs</string>
     <string name="menu_reset_terminal">Reset</string>
     <string name="menu_shutdown">Shut down</string>
