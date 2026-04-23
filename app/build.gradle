@@ -12,7 +12,7 @@ android {
         applicationId "sylirre.vmconsole"
         minSdkVersion 24
         targetSdkVersion 32
-        versionCode 2
+        versionCode 3
         versionName "1.1.0"
 
         archivesBaseName = "vmConsole-$versionName"
