@@ -117,6 +117,19 @@ public final class EnhancedTerminalActivity extends Activity implements ServiceC
         mTerminalView.setTypeface(Typeface.createFromAsset(getAssets(), "console_font.ttf"));
     }
 
+    public void changeFontSize(boolean increase) {
+        currentFontSize += (increase ? 2 : -2);
+        currentFontSize = Math.max(MIN_FONTSIZE, Math.min(currentFontSize, MAX_FONTSIZE));
+        mTerminalView.setTextSize(currentFontSize);
+    }
+
+    public void toggleShowExtraKeys() {
+        boolean enabled = mSettings.toggleShowExtraKeys(this);
+        if (mExtraKeysView != null) {
+            mExtraKeysView.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        }
+    }
+
     @Override
     protected void onStart() {
         super.onStart();
