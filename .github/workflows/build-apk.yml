@@ -60,6 +60,15 @@ jobs:
             rm -f vmconsole-dev.rsa
           fi
 
+      - name: Ensure Alpine ISO scripts are executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x external/alpine_iso/mkimage.sh
+          chmod +x external/alpine_iso/mkimg.base.sh
+          chmod +x external/alpine_iso/mkimg.vmconsole.sh
+          chmod +x external/alpine_iso/genapkovl-vmconsole.sh
+
       - name: Build repository-defined Alpine ISO
         working-directory: external/alpine_iso
         env:
