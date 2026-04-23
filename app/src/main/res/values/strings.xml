@@ -2,58 +2,74 @@
 <resources>
     <string name="application_name">vmConsole</string>
 
-    <!-- Common -->
     <string name="cancel_label">Cancel</string>
     <string name="exit_label">Exit</string>
     <string name="ok_label">OK</string>
 
-    <!-- Installer dialog -->
     <string name="installer_progress_message">Initializing…</string>
     <string name="installer_error_title">Initialization failed</string>
     <string name="installer_error_body">Application was unable to set up runtime resources.</string>
     <string name="installer_error_try_again_button">Try again</string>
 
-    <!-- Context menu: main -->
     <string name="menu_copy_text">Copy</string>
     <string name="menu_paste_text">Paste</string>
     <string name="menu_more">More…</string>
 
-    <!-- Context menu: more -->
     <string name="menu_open_ssh">Open SSH (%s)</string>
     <string name="menu_open_web">Open Web (%s)</string>
+    <string name="menu_open_vnc">Open VNC (%s)</string>
+    <string name="menu_copy_ssh_command">Copy SSH command</string>
+    <string name="menu_copy_vnc_address">Copy VNC address</string>
+    <string name="menu_show_ports">Show current ports</string>
+    <string name="menu_configure_ports">Configure ports</string>
+    <string name="menu_configure_display">Display mode</string>
     <string name="menu_autofill_pw">Autofill password</string>
     <string name="menu_select_urls">Select URLs</string>
     <string name="menu_reset_terminal">Reset</string>
     <string name="menu_shutdown">Shut down</string>
     <string name="menu_toggle_ignore_bell">Ignore bell character</string>
 
-    <!-- Context menu: Open SSH -->
     <string name="dialog_set_ssh_user_title">Connect as user:</string>
     <string name="dialog_set_ssh_user_invalid_name">Cannot use the given SSH user name.</string>
+    <string name="dialog_port_config_title">Custom port forwards</string>
+    <string name="dialog_display_mode_title">Display mode</string>
+    <string name="dialog_ports_format_hint">Use comma-separated values. Examples: 8080, 3306, 8081:80</string>
+    <string name="dialog_display_mode_hint">Text mode keeps the current serial console. VNC enables graphical output and exposes a local VNC endpoint.</string>
+    <string name="dialog_display_mode_text">Text console only</string>
+    <string name="dialog_display_mode_vnc">Enable VNC graphical output</string>
+    <string name="dialog_current_ports_title">Current runtime ports</string>
+
     <string name="toast_open_ssh_intent_failure">Unable to launch SSH client Android application.</string>
-    <string name="toast_open_ssh_unavailable">Cannot use this function because port forwarding failed.</string>
-
-    <!-- Context menu: Open Web -->
+    <string name="toast_open_ssh_unavailable">Cannot use this function because SSH forwarding is unavailable.</string>
     <string name="toast_open_web_intent_failure">Unable to launch web browser Android application.</string>
-    <string name="toast_open_web_unavailable">Cannot use this function because port forwarding failed.</string>
+    <string name="toast_open_web_unavailable">Cannot use this function because web forwarding is unavailable.</string>
+    <string name="toast_open_vnc_intent_failure">Unable to launch VNC client Android application.</string>
+    <string name="toast_open_vnc_unavailable">Cannot use this function because VNC is unavailable.</string>
+    <string name="toast_ports_saved">Port settings saved. Restart the VM to apply them.</string>
+    <string name="toast_display_mode_saved">Display mode saved. Restart the VM to apply it.</string>
+    <string name="toast_copied_to_clipboard">Copied to clipboard.</string>
 
-    <!-- Select URL dialog -->
     <string name="toast_no_urls_found">No URLs detected.</string>
     <string name="toast_url_copied">URL has been copied to clipboard.</string>
     <string name="toast_bad_url">Cannot open this URL!</string>
     <string name="select_url_dialog_title">Click URL to copy or long press to open:</string>
 
-    <!-- Shut down dialog -->
     <string name="dialog_shut_down_title">Shut down VM</string>
     <string name="dialog_shut_down_desc">All unsaved data will be lost, do you want to continue?</string>
     <string name="dialog_shut_down_yes_btn">Yes</string>
 
-    <!-- Notification -->
     <string name="notification_action_wake_lock">Acquire wakelock</string>
     <string name="notification_action_wake_unlock">Release wakelock</string>
     <string name="notification_action_shutdown">Shut down</string>
+    <string name="notification_title_running">QEMU is running</string>
+    <string name="notification_title_stopped">QEMU is not initialized</string>
+    <string name="notification_label_ip">IP</string>
+    <string name="notification_label_ssh">SSH</string>
+    <string name="notification_label_web">WEB</string>
+    <string name="notification_label_vnc">VNC</string>
+    <string name="notification_no_ports">Tap to open the application.</string>
+    <string name="notification_wakelock_held">Wake lock held.</string>
 
-    <!-- Misc -->
     <string name="toast_no_storage_permission">No storage permission granted: you will not be able to mount external storage!</string>
     <string name="toast_reset_terminal">Terminal state has been reset.</string>
 </resources>
