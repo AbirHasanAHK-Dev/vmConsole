@@ -39,6 +39,9 @@
     <string name="dialog_display_mode_text">Text console only</string>
     <string name="dialog_display_mode_vnc">Enable VNC graphical output</string>
     <string name="dialog_current_ports_title">Current runtime ports</string>
+    <string name="dialog_runtime_warning_title">Runtime warning</string>
+    <string name="dialog_runtime_warning_no_output">The VM started but no boot output appeared in the terminal. The guest may not be exposing a serial console, or the runtime ISO may not match vmConsole’s expected boot flow.</string>
+    <string name="dialog_runtime_warning_session_ended">The VM session ended unexpectedly. Rebuild and reinstall the app so the runtime assets are refreshed, then verify the generated Alpine image still targets vmConsole’s serial console boot.</string>
 
     <string name="toast_open_ssh_intent_failure">Unable to launch SSH client Android application.</string>
     <string name="toast_open_ssh_unavailable">Cannot use this function because SSH forwarding is unavailable.</string>
