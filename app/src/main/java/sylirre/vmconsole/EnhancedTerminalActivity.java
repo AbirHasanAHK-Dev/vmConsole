@@ -326,7 +326,7 @@ public final class EnhancedTerminalActivity extends Activity implements ServiceC
         processArgs.addAll(Arrays.asList("-device", "scsi-cd,bus=virtio-scsi-pci0.0,id=scsi-cd0,drive=cd0"));
         processArgs.addAll(Arrays.asList("-device", "scsi-hd,bus=virtio-scsi-pci0.0,id=scsi-hd0,drive=hd0"));
         processArgs.addAll(Arrays.asList("-device", "scsi-hd,bus=virtio-scsi-pci0.0,id=scsi-hd1,drive=hd1"));
-        processArgs.addAll(Arrays.asList("-boot", "d,menu=on"));
+        processArgs.addAll(Arrays.asList("-boot", "c,menu=on"));
         processArgs.addAll(Arrays.asList("-object", "rng-random,filename=/dev/urandom,id=rng0"));
         processArgs.addAll(Arrays.asList("-device", "virtio-rng-pci,rng=rng0,id=virtio-rng-pci0"));
 
