@@ -60,38 +60,7 @@ jobs:
             rm -f vmconsole-dev.rsa
           fi
 
-      - name: Pin Alpine ISO builder to stable repositories
-        working-directory: external/alpine_iso
-        run: |
-          set -euo pipefail
-          sed -i 's|^ALPINE_LINUX_TAG := .*|ALPINE_LINUX_TAG := v3.23|' Makefile
-          sed -i 's|^ALPINE_LINUX_REPO_EDGE := .*|ALPINE_LINUX_REPO_EDGE := https://dl-cdn.alpinelinux.org/alpine/v3.23/main|' Makefile
-          sed -i 's|^ALPINE_LINUX_REPO_EDGE_COMMUNITY := .*|ALPINE_LINUX_REPO_EDGE_COMMUNITY := https://dl-cdn.alpinelinux.org/alpine/v3.23/community|' Makefile
-          sed -i '/ALPINE_LINUX_REPO_TESTING/d' Makefile
-          sed -i '/ALPINE_LINUX_REPO_TESTING/d' mkimage.sh || true
-
-      - name: Use minimal runtime package set for Alpine ISO
-        working-directory: external/alpine_iso
-        run: |
-          set -euo pipefail
-          cat > packages.txt <<'EOF'
-          alpine-base
-          bash
-          curl
-          e2fsprogs
-          e2fsprogs-extra
-          libc6-compat
-          lynx
-          nano
-          nano-syntax
-          openssh-client
-          openssl
-          syslinux
-          tmux
-          vim
-          EOF
-
-      - name: Build Alpine Linux ISO
+      - name: Build repository-defined Alpine ISO
         working-directory: external/alpine_iso
         env:
           RSA_KEY_PASSPHRASE: ${{ secrets.ABUILD_KEY_PASSPHRASE }}
