@@ -1,0 +1,13 @@
+profile_vmconsole() {
+	profile_base
+	arch="x86_64"
+	profile_abbrev="vmc"
+	hostname="vmconsole"
+	image_name="alpine"
+	output_filename="alpine-x86_64.iso"
+	kernel_cmdline="console=ttyS0,115200 console=tty0"
+	syslinux_serial="0 115200"
+	syslinux_timeout="20"
+	syslinux_prompt="1"
+	apks="$apks openssh-server"
+}
