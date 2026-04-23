@@ -29,25 +29,17 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.text.format.Formatter;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import sylirre.vmconsole.termlib.TerminalSession;
 import sylirre.vmconsole.termlib.TerminalSession.SessionChangedCallback;
 
-/**
- * A service holding a list of terminal sessions, {@link #mTerminalSession}, showing a foreground notification while
- * running so that it is not terminated. The user interacts with the session through {@link TerminalActivity}, but this
- * service may outlive the activity when the user or the system disposes of the activity. In that case the user may
- * restart {@link TerminalActivity} later to yet again access the sessions.
- * <p/>
- * In order to keep both terminal sessions and spawned processes (who may outlive the terminal sessions) alive as long
- * as wanted by the user this service is a foreground service, {@link Service#startForeground(int, Notification)}.
- * <p/>
- * Optionally may hold a wake and a wifi lock, in which case that is shown in the notification - see
- * {@link #buildNotification()}.
- */
 public class TerminalService extends Service implements SessionChangedCallback {
 
     private static final String INTENT_ACTION_SERVICE_STOP = "sylirre.vmconsole.ACTION_STOP_SERVICE";
@@ -63,27 +55,22 @@ public class TerminalService extends Service implements SessionChangedCallback {
 
     public int SSH_PORT = -1;
     public int WEB_PORT = -1;
+    public int VNC_PORT = -1;
+    private final ArrayList<PortForward> mCustomForwards = new ArrayList<>();
 
-    /**
-     * Note that the service may often outlive the activity, so need to clear this reference.
-     */
     SessionChangedCallback mSessionChangeCallback;
-
-    /**
-     * If the user has executed the {@link #INTENT_ACTION_SERVICE_STOP} intent.
-     */
     boolean mWantsToStop = false;
 
-    /**
-     * The wake lock and wifi lock are always acquired and released together.
-     */
     private PowerManager.WakeLock mWakeLock;
     private WifiManager.WifiLock mWifiLock;
 
-
     private void setupNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, getString(R.string.application_name), NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel channel = new NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                getString(R.string.application_name),
+                NotificationManager.IMPORTANCE_LOW
+            );
             channel.setDescription("Notifications from " + getString(R.string.application_name));
 
             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -108,7 +95,7 @@ public class TerminalService extends Service implements SessionChangedCallback {
     @SuppressLint({"Wakelock", "WakelockTimeout"})
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        String action = intent.getAction();
+        String action = intent == null ? null : intent.getAction();
 
         setupNotificationChannel();
         startForeground(NOTIFICATION_ID, buildNotification());
@@ -121,7 +108,6 @@ public class TerminalService extends Service implements SessionChangedCallback {
                 mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, Config.WAKELOCK_LOG_TAG);
                 mWakeLock.acquire();
 
-                // http://tools.android.com/tech-docs/lint-in-studio-2-3#TOC-WifiManager-Leak
                 WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
                 mWifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, Config.WAKELOCK_LOG_TAG);
                 mWifiLock.acquire();
@@ -142,8 +128,6 @@ public class TerminalService extends Service implements SessionChangedCallback {
             Log.w(Config.APP_LOG_TAG, "received an unknown action for TerminalService: " + action);
         }
 
-        // If this service really do get killed, there is no point restarting it automatically - let the user do on next
-        // start of {@link Term):
         return Service.START_NOT_STICKY;
     }
 
@@ -195,6 +179,57 @@ public class TerminalService extends Service implements SessionChangedCallback {
         updateNotification();
     }
 
+    public void resetRuntimeState() {
+        SSH_PORT = -1;
+        WEB_PORT = -1;
+        VNC_PORT = -1;
+        mCustomForwards.clear();
+        updateNotification();
+    }
+
+    public void setVncPort(int vncPort) {
+        VNC_PORT = vncPort;
+        updateNotification();
+    }
+
+    public void setCustomForwards(List<PortForward> forwards) {
+        mCustomForwards.clear();
+        if (forwards != null) {
+            mCustomForwards.addAll(forwards);
+        }
+        updateNotification();
+    }
+
+    public ArrayList<PortForward> getCustomForwards() {
+        return new ArrayList<>(mCustomForwards);
+    }
+
+    public String getConnectionSummaryText() {
+        StringBuilder builder = new StringBuilder();
+
+        String ipAddress = getLocalIpAddress();
+        if (ipAddress != null && !ipAddress.isEmpty() && !"0.0.0.0".equals(ipAddress)) {
+            builder.append(getString(R.string.notification_label_ip)).append(": ").append(ipAddress);
+        }
+
+        appendLine(builder, getString(R.string.notification_label_ssh), SSH_PORT);
+        appendLine(builder, getString(R.string.notification_label_web), WEB_PORT);
+        appendLine(builder, getString(R.string.notification_label_vnc), VNC_PORT);
+
+        for (PortForward forward : mCustomForwards) {
+            if (builder.length() > 0) {
+                builder.append('\n');
+            }
+            builder.append(forward.toDisplayString());
+        }
+
+        if (builder.length() == 0) {
+            builder.append(getString(R.string.notification_no_ports));
+        }
+
+        return builder.toString();
+    }
+
     public void terminateService() {
         mWantsToStop = true;
         if (mTerminalSession != null) mTerminalSession.finishIfRunning();
@@ -202,71 +237,80 @@ public class TerminalService extends Service implements SessionChangedCallback {
         stopSelf();
     }
 
-    private Notification buildNotification() {
-        Intent notifyIntent = new Intent(this, TerminalActivity.class);
-        // PendingIntent#getActivity(): "Note that the activity will be started outside of the context of an existing
-        // activity, so you must use the Intent.FLAG_ACTIVITY_NEW_TASK launch flag in the Intent":
-        notifyIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notifyIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        String contentTitle = "QEMU is not initialized";
-        StringBuilder contentText = new StringBuilder();
-        contentText.append("Tap to open the application.");
-
-        if (mTerminalSession != null) {
-            contentTitle = "QEMU is running";
-        }
-
-        final boolean wakeLockHeld = mWakeLock != null;
-
-        if (wakeLockHeld) {
-            contentText.append(" Wake lock held.");
-        }
-
-        if (mTerminalSession != null) {
-            String terminalTitle = mTerminalSession.getTitle();
-            if (terminalTitle != null && !terminalTitle.isEmpty()) {
-                contentText.append("\n" + mTerminalSession.getTitle());
+    private String getLocalIpAddress() {
+        try {
+            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wm == null || wm.getConnectionInfo() == null) {
+                return null;
             }
+            return Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress());
+        } catch (Exception e) {
+            Log.w(Config.APP_LOG_TAG, "Unable to get local IP address", e);
+            return null;
+        }
+    }
+
+    private void appendLine(StringBuilder builder, String label, int port) {
+        if (port == -1) {
+            return;
+        }
+        if (builder.length() > 0) {
+            builder.append('\n');
+        }
+        builder.append(label).append(": ").append(port);
+    }
+
+    private Notification buildNotification() {
+        Intent notifyIntent = new Intent(this, EnhancedTerminalActivity.class);
+        notifyIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            notifyIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        String contentTitle = getString(R.string.notification_title_stopped);
+        if (mTerminalSession != null) {
+            contentTitle = getString(R.string.notification_title_running);
+        }
+
+        StringBuilder contentText = new StringBuilder(getConnectionSummaryText());
+        final boolean wakeLockHeld = mWakeLock != null;
+        if (wakeLockHeld) {
+            contentText.append('\n').append(getString(R.string.notification_wakelock_held));
         }
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID);
         builder.setContentIntent(pendingIntent);
         builder.setContentTitle(contentTitle);
         builder.setContentText(contentText.toString());
+        builder.setStyle(new NotificationCompat.BigTextStyle().bigText(contentText.toString()));
         builder.setSmallIcon(R.drawable.ic_service_notification);
         builder.setPriority(NotificationCompat.PRIORITY_HIGH);
         builder.setOngoing(true);
-
-        // No need to show a timestamp:
         builder.setShowWhen(false);
-
-        // Background color for small notification icon:
         builder.setColor(0xFF000000);
 
         String newWakeAction = wakeLockHeld ? INTENT_ACTION_WAKELOCK_DISABLE : INTENT_ACTION_WAKELOCK_ENABLE;
         Intent toggleWakeLockIntent = new Intent(this, TerminalService.class).setAction(newWakeAction);
-        String actionTitle = getResources().getString(wakeLockHeld ?
-            R.string.notification_action_wake_unlock :
-            R.string.notification_action_wake_lock);
+        String actionTitle = getResources().getString(
+            wakeLockHeld ? R.string.notification_action_wake_unlock : R.string.notification_action_wake_lock
+        );
         int actionIcon = wakeLockHeld ? android.R.drawable.ic_lock_idle_lock : android.R.drawable.ic_lock_lock;
-        builder.addAction(actionIcon, actionTitle, PendingIntent.getService(this, 0, toggleWakeLockIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        builder.addAction(
+            actionIcon,
+            actionTitle,
+            PendingIntent.getService(this, 0, toggleWakeLockIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)
+        );
 
         return builder.build();
     }
 
-    /**
-     * Update the shown foreground service notification after making any changes that affect it.
-     */
-    private void updateNotification() {
-        if (mTerminalSession != null) {
-            ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(NOTIFICATION_ID, buildNotification());
-        }
+    public void updateNotification() {
+        ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(NOTIFICATION_ID, buildNotification());
     }
 
-    /**
-     * This service is only bound from inside the same process and never uses IPC.
-     */
     public class LocalBinder extends Binder {
         public final TerminalService service = TerminalService.this;
     }
