@@ -24,6 +24,7 @@ import android.system.Os;
 import android.system.OsConstants;
 import android.util.Log;
 
+import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -32,6 +33,8 @@ import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+
+import sylirre.vmconsole.Config;
 
 /**
  * A terminal session, consisting of a process coupled to a terminal interface.
@@ -116,6 +119,11 @@ public final class TerminalSession extends TerminalOutput {
     /** Set by the application for user identification of session, not by terminal. */
     public String mSessionName;
 
+    private final String mArgs[];
+    private final String[] mEnv;
+    private final String mCwd;
+    private FileOutputStream mSerialLogStream;
+
     @SuppressLint("HandlerLeak")
     final Handler mMainThreadHandler = new Handler() {
         final byte[] mReceiveBuffer = new byte[4 * 1024];
@@ -150,13 +158,45 @@ public final class TerminalSession extends TerminalOutput {
         }
     };
 
-    private final String[] mArgs;
-    private final String[] mEnv;
-
     public TerminalSession(String[] args, String[] env, String cwd, SessionChangedCallback changeCallback) {
         mChangeCallback = changeCallback;
         this.mArgs = args;
         this.mEnv = env;
+        this.mCwd = cwd;
+    }
+
+    private synchronized void openSerialLog() {
+        closeSerialLog();
+        try {
+            File serialLogFile = new File(mCwd, Config.SERIAL_LOG_NAME);
+            mSerialLogStream = new FileOutputStream(serialLogFile, false);
+        } catch (IOException e) {
+            Log.w(Config.APP_LOG_TAG, "failed to open serial log file", e);
+            mSerialLogStream = null;
+        }
+    }
+
+    private synchronized void appendSerialLog(byte[] buffer, int offset, int count) {
+        if (mSerialLogStream == null) {
+            return;
+        }
+        try {
+            mSerialLogStream.write(buffer, offset, count);
+            mSerialLogStream.flush();
+        } catch (IOException e) {
+            Log.w(Config.APP_LOG_TAG, "failed to write serial log file", e);
+            closeSerialLog();
+        }
+    }
+
+    private synchronized void closeSerialLog() {
+        if (mSerialLogStream != null) {
+            try {
+                mSerialLogStream.close();
+            } catch (IOException ignored) {
+            }
+            mSerialLogStream = null;
+        }
     }
 
     /** Inform the attached pty of the new size and reflow or initialize the emulator. */
@@ -183,6 +223,8 @@ public final class TerminalSession extends TerminalOutput {
     public void initializeEmulator(int columns, int rows) {
         mEmulator = new TerminalEmulator(this, columns, rows, /* transcript= */5000);
 
+        openSerialLog();
+
         int[] processId = new int[1];
         mTerminalFileDescriptor = JNI.createSubprocess(mArgs, mEnv, processId, rows, columns);
         mShellPid = processId[0];
@@ -197,6 +239,7 @@ public final class TerminalSession extends TerminalOutput {
                     while (true) {
                         int read = termIn.read(buffer);
                         if (read == -1) return;
+                        appendSerialLog(buffer, 0, read);
                         if (!mProcessToTerminalIOQueue.write(buffer, 0, read)) return;
                         mMainThreadHandler.sendEmptyMessage(MSG_NEW_INPUT);
                     }
@@ -311,6 +354,7 @@ public final class TerminalSession extends TerminalOutput {
         // Stop the reader and writer threads, and close the I/O streams
         mTerminalToProcessIOQueue.close();
         mProcessToTerminalIOQueue.close();
+        closeSerialLog();
         JNI.close(mTerminalFileDescriptor);
     }
 
