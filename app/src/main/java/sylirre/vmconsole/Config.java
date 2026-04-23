@@ -2,7 +2,7 @@
 *************************************************************************
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
+		the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -40,6 +40,11 @@ public class Config {
      * Must be a name of file located in assets directory.
      */
     public static final String SECONDARY_HDD_IMAGE_NAME = "userdata-02.qcow2";
+
+    /**
+     * Name of serial boot log file stored in the app runtime directory.
+     */
+    public static final String SERIAL_LOG_NAME = "boot-serial.log";
 
     /**
      * Upstream name server used by QEMU DNS resolver (IPv4).
