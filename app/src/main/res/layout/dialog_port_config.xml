@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/dialog_ports_format_hint"
+        android:paddingBottom="12dp" />
+
+    <EditText
+        android:id="@+id/custom_port_mappings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="top|start"
+        android:hint="8080, 3306, 8081:80"
+        android:inputType="textMultiLine"
+        android:minLines="3" />
+</LinearLayout>
