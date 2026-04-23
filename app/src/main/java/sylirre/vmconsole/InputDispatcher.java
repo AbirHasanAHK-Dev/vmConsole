@@ -29,28 +29,76 @@ import java.util.Objects;
 import sylirre.vmconsole.termlib.KeyHandler;
 import sylirre.vmconsole.termlib.TerminalEmulator;
 import sylirre.vmconsole.termlib.TerminalSession;
+import sylirre.vmconsole.termview.TerminalView;
 import sylirre.vmconsole.termview.TerminalViewClient;
 
 @SuppressWarnings("WeakerAccess")
 public final class InputDispatcher implements TerminalViewClient {
 
     private final TerminalActivity mActivity;
+    private final EnhancedTerminalActivity mEnhancedActivity;
 
-    /**
-     * Keeping track of the special keys acting as Ctrl and Fn for the soft keyboard and
-     * other hardware keys.
-     */
     private boolean mVirtualControlKeyDown, mVirtualFnKeyDown;
 
     public InputDispatcher(TerminalActivity activity) {
         this.mActivity = activity;
+        this.mEnhancedActivity = null;
+    }
+
+    public InputDispatcher(EnhancedTerminalActivity activity) {
+        this.mActivity = null;
+        this.mEnhancedActivity = activity;
+    }
+
+    private Context getContext() {
+        return mActivity != null ? mActivity : mEnhancedActivity;
+    }
+
+    private TerminalView getTerminalView() {
+        return mActivity != null ? mActivity.mTerminalView : mEnhancedActivity.mTerminalView;
+    }
+
+    private ExtraKeysView getExtraKeysView() {
+        return mActivity != null ? mActivity.mExtraKeysView : mEnhancedActivity.mExtraKeysView;
+    }
+
+    private void changeFontSize(boolean increase) {
+        if (mActivity != null) {
+            mActivity.changeFontSize(increase);
+        } else {
+            mEnhancedActivity.changeFontSize(increase);
+        }
+    }
+
+    private void showUrlSelection() {
+        if (mActivity != null) {
+            mActivity.showUrlSelection();
+        } else {
+            mEnhancedActivity.showUrlSelection();
+        }
+    }
+
+    private void doPaste() {
+        if (mActivity != null) {
+            mActivity.doPaste();
+        } else {
+            mEnhancedActivity.doPaste();
+        }
+    }
+
+    private void toggleShowExtraKeys() {
+        if (mActivity != null) {
+            mActivity.toggleShowExtraKeys();
+        } else {
+            mEnhancedActivity.toggleShowExtraKeys();
+        }
     }
 
     @Override
     public float onScale(float scale) {
         if (scale < 0.9f || scale > 1.1f) {
             boolean increase = scale > 1.f;
-            mActivity.changeFontSize(increase);
+            changeFontSize(increase);
             return 1.0f;
         }
 
@@ -59,10 +107,9 @@ public final class InputDispatcher implements TerminalViewClient {
 
     @Override
     public void onSingleTapUp(MotionEvent e) {
-        InputMethodManager mgr = (InputMethodManager)
-            mActivity.getSystemService(Context.INPUT_METHOD_SERVICE);
+        InputMethodManager mgr = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
         if (mgr != null) {
-            mgr.showSoftInput(mActivity.mTerminalView, InputMethodManager.SHOW_IMPLICIT);
+            mgr.showSoftInput(getTerminalView(), InputMethodManager.SHOW_IMPLICIT);
         }
     }
 
@@ -72,27 +119,23 @@ public final class InputDispatcher implements TerminalViewClient {
         if (handleVirtualKeys(keyCode, e, true)) return true;
 
         if (e.isCtrlPressed() && e.isAltPressed()) {
-            // Get the unmodified code point:
             int unicodeChar = e.getUnicodeChar(0);
 
-            if (unicodeChar == 'k'/* keyboard */) {
-                InputMethodManager imm = (InputMethodManager)
-                    mActivity.getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (unicodeChar == 'k') {
+                InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
                 }
-            } else if (unicodeChar == 'm'/* menu */) {
-                mActivity.mTerminalView.showContextMenu();
-            } else if (unicodeChar == 'u' /* urls */) {
-                mActivity.showUrlSelection();
-            } else if (unicodeChar == 'v' /* paste clipboard */) {
-                mActivity.doPaste();
+            } else if (unicodeChar == 'm') {
+                getTerminalView().showContextMenu();
+            } else if (unicodeChar == 'u') {
+                showUrlSelection();
+            } else if (unicodeChar == 'v') {
+                doPaste();
             } else if (unicodeChar == '+' || e.getUnicodeChar(KeyEvent.META_SHIFT_ON) == '+') {
-                // We also check for the shifted char here since shift may be required to
-                // produce '+'.
-                mActivity.changeFontSize(true);
+                changeFontSize(true);
             } else if (unicodeChar == '-') {
-                mActivity.changeFontSize(false);
+                changeFontSize(false);
             }
 
             return true;
@@ -108,23 +151,26 @@ public final class InputDispatcher implements TerminalViewClient {
 
     @Override
     public boolean readControlKey() {
-        return (mActivity.mExtraKeysView != null &&
-            mActivity.mExtraKeysView.readControlButton()) || mVirtualControlKeyDown;
+        ExtraKeysView extraKeysView = getExtraKeysView();
+        return (extraKeysView != null && extraKeysView.readControlButton()) || mVirtualControlKeyDown;
     }
 
     @Override
     public boolean readAltKey() {
-        return (mActivity.mExtraKeysView != null && mActivity.mExtraKeysView.readAltButton());
+        ExtraKeysView extraKeysView = getExtraKeysView();
+        return extraKeysView != null && extraKeysView.readAltButton();
     }
 
     @Override
     public boolean readShiftKey() {
-        return (mActivity.mExtraKeysView != null && mActivity.mExtraKeysView.readShiftButton());
+        ExtraKeysView extraKeysView = getExtraKeysView();
+        return extraKeysView != null && extraKeysView.readShiftButton();
     }
 
     @Override
     public boolean readFnKey() {
-        return (mActivity.mExtraKeysView != null && mActivity.mExtraKeysView.readFnButton());
+        ExtraKeysView extraKeysView = getExtraKeysView();
+        return extraKeysView != null && extraKeysView.readFnButton();
     }
 
     @Override
@@ -137,7 +183,6 @@ public final class InputDispatcher implements TerminalViewClient {
             int lowerCase = Character.toLowerCase(codePoint);
 
             switch (lowerCase) {
-                // Arrow keys.
                 case 'w':
                     resultingKeyCode = KeyEvent.KEYCODE_DPAD_UP;
                     break;
@@ -150,16 +195,12 @@ public final class InputDispatcher implements TerminalViewClient {
                 case 'd':
                     resultingKeyCode = KeyEvent.KEYCODE_DPAD_RIGHT;
                     break;
-
-                // Page up and down.
                 case 'p':
                     resultingKeyCode = KeyEvent.KEYCODE_PAGE_UP;
                     break;
                 case 'n':
                     resultingKeyCode = KeyEvent.KEYCODE_PAGE_DOWN;
                     break;
-
-                // Some special keys:
                 case 't':
                     resultingKeyCode = KeyEvent.KEYCODE_TAB;
                     break;
@@ -169,16 +210,12 @@ public final class InputDispatcher implements TerminalViewClient {
                 case 'h':
                     resultingCodePoint = '~';
                     break;
-
-                // Special characters to input.
                 case 'u':
                     resultingCodePoint = '_';
                     break;
                 case 'l':
                     resultingCodePoint = '|';
                     break;
-
-                // Function keys.
                 case '1':
                 case '2':
                 case '3':
@@ -193,36 +230,28 @@ public final class InputDispatcher implements TerminalViewClient {
                 case '0':
                     resultingKeyCode = KeyEvent.KEYCODE_F10;
                     break;
-
-                // Other special keys.
                 case 'e':
-                    resultingCodePoint = /*Escape*/ 27;
+                    resultingCodePoint = 27;
                     break;
                 case '.':
-                    resultingCodePoint = /*^.*/ 28;
+                    resultingCodePoint = 28;
                     break;
-
-                case 'b': // alt+b, jumping backward in readline.
-                case 'f': // alf+f, jumping forward in readline.
-                case 'x': // alt+x, common in emacs.
+                case 'b':
+                case 'f':
+                case 'x':
                     resultingCodePoint = lowerCase;
                     altDown = true;
                     break;
-
-                // Volume control.
                 case 'v':
                     resultingCodePoint = -1;
-                    AudioManager audio = (AudioManager)
-                        mActivity.getSystemService(Context.AUDIO_SERVICE);
+                    AudioManager audio = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
                     if (audio != null) {
                         audio.adjustSuggestedStreamVolume(AudioManager.ADJUST_SAME,
                             AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI);
                     }
                     break;
-
-                // Extra Keys toggle.
                 case 'k':
-                    mActivity.toggleShowExtraKeys();
+                    toggleShowExtraKeys();
                     mVirtualFnKeyDown = false;
                     break;
             }
@@ -245,13 +274,10 @@ public final class InputDispatcher implements TerminalViewClient {
         return false;
     }
 
-    /** Handle dedicated volume buttons as virtual keys if applicable. */
     private boolean handleVirtualKeys(int keyCode, KeyEvent event, boolean down) {
         InputDevice inputDevice = event.getDevice();
 
-        if (inputDevice != null &&
-            inputDevice.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC) {
-            // Do not steal dedicated buttons from a full external keyboard.
+        if (inputDevice != null && inputDevice.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC) {
             return false;
         } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
             mVirtualControlKeyDown = down;
