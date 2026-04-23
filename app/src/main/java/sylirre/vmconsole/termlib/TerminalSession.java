@@ -119,7 +119,7 @@ public final class TerminalSession extends TerminalOutput {
     /** Set by the application for user identification of session, not by terminal. */
     public String mSessionName;
 
-    private final String mArgs[];
+    private final String[] mArgs;
     private final String[] mEnv;
     private final String mCwd;
     private FileOutputStream mSerialLogStream;
@@ -170,10 +170,26 @@ public final class TerminalSession extends TerminalOutput {
         try {
             File serialLogFile = new File(mCwd, Config.SERIAL_LOG_NAME);
             mSerialLogStream = new FileOutputStream(serialLogFile, false);
+            appendSerialLogText("=== vmConsole boot serial diagnostic ===\n");
+            appendSerialLogText("logFile=" + serialLogFile.getAbsolutePath() + "\n");
+            appendSerialLogText("cwd=" + mCwd + "\n");
+            appendSerialLogText("argv:\n");
+            for (int i = 0; i < mArgs.length; i++) {
+                appendSerialLogText("  [" + i + "] " + mArgs[i] + "\n");
+            }
+            appendSerialLogText("env:\n");
+            for (String env : mEnv) {
+                appendSerialLogText("  " + env + "\n");
+            }
+            appendSerialLogText("=== guest output follows ===\n");
         } catch (IOException e) {
             Log.w(Config.APP_LOG_TAG, "failed to open serial log file", e);
             mSerialLogStream = null;
         }
+    }
+
+    private synchronized void appendSerialLogText(String text) {
+        appendSerialLog(text.getBytes(StandardCharsets.UTF_8), 0, text.getBytes(StandardCharsets.UTF_8).length);
     }
 
     private synchronized void appendSerialLog(byte[] buffer, int offset, int count) {
@@ -228,6 +244,7 @@ public final class TerminalSession extends TerminalOutput {
         int[] processId = new int[1];
         mTerminalFileDescriptor = JNI.createSubprocess(mArgs, mEnv, processId, rows, columns);
         mShellPid = processId[0];
+        appendSerialLogText("subprocessPid=" + mShellPid + "\n");
 
         final FileDescriptor terminalFileDescriptorWrapped = wrapFileDescriptor(mTerminalFileDescriptor);
 
@@ -238,13 +255,16 @@ public final class TerminalSession extends TerminalOutput {
                     final byte[] buffer = new byte[4096];
                     while (true) {
                         int read = termIn.read(buffer);
-                        if (read == -1) return;
+                        if (read == -1) {
+                            appendSerialLogText("\n=== serial reader EOF ===\n");
+                            return;
+                        }
                         appendSerialLog(buffer, 0, read);
                         if (!mProcessToTerminalIOQueue.write(buffer, 0, read)) return;
                         mMainThreadHandler.sendEmptyMessage(MSG_NEW_INPUT);
                     }
                 } catch (Exception e) {
-                    // Ignore, just shutting down.
+                    appendSerialLogText("\n=== serial reader exception: " + e.getClass().getName() + ": " + e.getMessage() + " ===\n");
                 }
             }
         }.start();
@@ -269,6 +289,7 @@ public final class TerminalSession extends TerminalOutput {
             @Override
             public void run() {
                 int processExitCode = JNI.waitFor(mShellPid);
+                appendSerialLogText("\n=== process exited: " + processExitCode + " ===\n");
                 mMainThreadHandler.sendMessage(mMainThreadHandler.obtainMessage(MSG_PROCESS_EXITED, processExitCode));
             }
         }.start();
@@ -296,23 +317,23 @@ public final class TerminalSession extends TerminalOutput {
         } else if (codePoint <= /* 11 bits */0b11111111111) {
             /* 110xxxxx leading byte with leading 5 bits */
             mUtf8InputBuffer[bufferPosition++] = (byte) (0b11000000 | (codePoint >> 6));
-			/* 10xxxxxx continuation byte with following 6 bits */
+            /* 10xxxxxx continuation byte with following 6 bits */
             mUtf8InputBuffer[bufferPosition++] = (byte) (0b10000000 | (codePoint & 0b111111));
         } else if (codePoint <= /* 16 bits */0b1111111111111111) {
-			/* 1110xxxx leading byte with leading 4 bits */
+            /* 1110xxxx leading byte with leading 4 bits */
             mUtf8InputBuffer[bufferPosition++] = (byte) (0b11100000 | (codePoint >> 12));
-			/* 10xxxxxx continuation byte with following 6 bits */
+            /* 10xxxxxx continuation byte with following 6 bits */
             mUtf8InputBuffer[bufferPosition++] = (byte) (0b10000000 | ((codePoint >> 6) & 0b111111));
-			/* 10xxxxxx continuation byte with following 6 bits */
+            /* 10xxxxxx continuation byte with following 6 bits */
             mUtf8InputBuffer[bufferPosition++] = (byte) (0b10000000 | (codePoint & 0b111111));
         } else { /* We have checked codePoint <= 1114111 above, so we have max 21 bits = 0b111111111111111111111 */
-			/* 11110xxx leading byte with leading 3 bits */
+            /* 11110xxx leading byte with leading 3 bits */
             mUtf8InputBuffer[bufferPosition++] = (byte) (0b11110000 | (codePoint >> 18));
-			/* 10xxxxxx continuation byte with following 6 bits */
+            /* 10xxxxxx continuation byte with following 6 bits */
             mUtf8InputBuffer[bufferPosition++] = (byte) (0b10000000 | ((codePoint >> 12) & 0b111111));
-			/* 10xxxxxx continuation byte with following 6 bits */
+            /* 10xxxxxx continuation byte with following 6 bits */
             mUtf8InputBuffer[bufferPosition++] = (byte) (0b10000000 | ((codePoint >> 6) & 0b111111));
-			/* 10xxxxxx continuation byte with following 6 bits */
+            /* 10xxxxxx continuation byte with following 6 bits */
             mUtf8InputBuffer[bufferPosition++] = (byte) (0b10000000 | (codePoint & 0b111111));
         }
         write(mUtf8InputBuffer, 0, bufferPosition);
@@ -350,6 +371,8 @@ public final class TerminalSession extends TerminalOutput {
             mShellPid = -1;
             mShellExitStatus = exitStatus;
         }
+
+        appendSerialLogText("\n=== cleanupResources exitStatus=" + exitStatus + " ===\n");
 
         // Stop the reader and writer threads, and close the I/O streams
         mTerminalToProcessIOQueue.close();
