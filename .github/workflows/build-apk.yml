@@ -69,7 +69,7 @@ jobs:
           if [ -z "${RSA_KEY_PASSPHRASE:-}" ]; then
             export RSA_KEY_PASSPHRASE=pass
           fi
-          make build-docker OUTPUT_DIR=$(realpath ../../app/src/main/assets)
+          make -f Makefile.vmconsole build-docker OUTPUT_DIR=$(realpath ../../app/src/main/assets)
 
       - name: Patch zlib package version for libVMC
         working-directory: external/libvmc/packages/zlib
