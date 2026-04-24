@@ -8,7 +8,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-mkdir -p "$ROOT/etc" "$ROOT/usr/local/sbin" "$ROOT/etc/profile.d"
+mkdir -p "$ROOT/etc" "$ROOT/usr/local/sbin" "$ROOT/etc/profile.d" "$ROOT/etc/network" "$ROOT/etc/local.d" "$ROOT/etc/runlevels/default"
 printf '%s\n' "$HOSTNAME" > "$ROOT/etc/hostname"
 
 cat > "$ROOT/etc/inittab" <<'EOF'
@@ -20,8 +20,46 @@ cat > "$ROOT/etc/inittab" <<'EOF'
 ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100
 EOF
 
+cat > "$ROOT/etc/resolv.conf" <<'EOF'
+nameserver 10.0.2.3
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+EOF
+
+cat > "$ROOT/etc/network/interfaces" <<'EOF'
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+    address 10.0.2.15
+    netmask 255.255.255.0
+    gateway 10.0.2.2
+EOF
+
+cat > "$ROOT/etc/local.d/vmconsole-net.start" <<'EOF'
+#!/bin/sh
+ip link set eth0 up 2>/dev/null || true
+ip addr show dev eth0 | grep -q 'inet 10\.0\.2\.15/' || ip addr add 10.0.2.15/24 dev eth0 2>/dev/null || true
+ip route show default | grep -q . || ip route add default via 10.0.2.2 dev eth0 2>/dev/null || true
+mkdir -p /etc
+cat > /etc/resolv.conf <<RESOLV
+nameserver 10.0.2.3
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+RESOLV
+EOF
+chmod +x "$ROOT/etc/local.d/vmconsole-net.start"
+ln -sf /etc/init.d/local "$ROOT/etc/runlevels/default/local"
+
 cat > "$ROOT/etc/motd" <<'EOF'
 Welcome to vmConsole Alpine.
+
+Network note:
+vmConsole uses QEMU user networking. If DHCP fails, the live system uses:
+  eth0: 10.0.2.15/24
+  gateway: 10.0.2.2
+  DNS: 10.0.2.3, 1.1.1.1, 8.8.8.8
 
 Important for installed systems:
 After running setup-alpine/setup-disk and before rebooting, run:
@@ -37,6 +75,7 @@ cat > "$ROOT/etc/profile.d/vmconsole.sh" <<'EOF'
 if [ -t 0 ]; then
     echo
     echo "vmConsole hint: after setup-alpine/setup-disk, run: vmconsole-fix-installed-boot /mnt"
+    echo "vmConsole network: static eth0 fallback is 10.0.2.15 via 10.0.2.2"
     echo
 fi
 EOF
@@ -142,6 +181,25 @@ patch_inittab() {
     fi
 }
 
+patch_network() {
+    mkdir -p "$TARGET/etc/network"
+    cat > "$TARGET/etc/resolv.conf" <<RESOLV
+nameserver 10.0.2.3
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+RESOLV
+    cat > "$TARGET/etc/network/interfaces" <<NET
+    auto lo
+    iface lo inet loopback
+
+    auto eth0
+    iface eth0 inet static
+        address 10.0.2.15
+        netmask 255.255.255.0
+        gateway 10.0.2.2
+NET
+}
+
 run_chroot_updates() {
     [ -x "$TARGET/bin/sh" ] || return 0
 
@@ -175,6 +233,7 @@ patch_grub_default
 patch_grub_cfg_direct
 patch_extlinux
 patch_inittab
+patch_network
 run_chroot_updates
 patch_grub_cfg_direct
 patch_extlinux
