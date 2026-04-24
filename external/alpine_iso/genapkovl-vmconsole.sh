@@ -45,7 +45,7 @@ cat > "$ROOT/usr/local/sbin/vmconsole-fix-installed-boot" <<'EOF'
 #!/bin/sh
 set -eu
 
-SERIAL_CMDLINE="console=ttyS0,115200n8 console=tty0 earlycon=uart,io,0x3f8,115200 panic=30"
+SERIAL_CMDLINE="nomodeset vga=normal console=tty0 console=ttyS0,115200n8 earlycon=uart,io,0x3f8,115200 panic=30"
 TARGET="${1:-/mnt}"
 
 log() {
@@ -79,6 +79,8 @@ patch_grub_default() {
     set_or_append_var "$grub_default" GRUB_CMDLINE_LINUX "$SERIAL_CMDLINE"
     set_or_append_var "$grub_default" GRUB_TERMINAL "serial console"
     set_or_append_var "$grub_default" GRUB_SERIAL_COMMAND "serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1"
+    set_or_append_var "$grub_default" GRUB_GFXMODE "text"
+    set_or_append_var "$grub_default" GRUB_GFXPAYLOAD_LINUX "text"
     set_or_append_var "$grub_default" GRUB_TIMEOUT "5"
 }
 
@@ -95,10 +97,12 @@ patch_grub_cfg_direct() {
             printf '%s\n' 'serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1'
             printf '%s\n' 'terminal_input serial console'
             printf '%s\n' 'terminal_output serial console'
+            printf '%s\n' 'set gfxpayload=text'
             cat "$grub_cfg"
         } > "$tmp"
         mv "$tmp" "$grub_cfg"
     fi
+    grep -q '^set gfxpayload=text' "$grub_cfg" || sed -i '1iset gfxpayload=text' "$grub_cfg"
 }
 
 patch_extlinux() {
