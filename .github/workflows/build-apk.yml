@@ -80,12 +80,14 @@ jobs:
           fi
           make -f Makefile.vmconsole build-docker OUTPUT_DIR=$(realpath ../../app/src/main/assets)
 
-      - name: Patch QEMU boot compatibility settings
+      - name: Patch QEMU boot compatibility and enhanced launcher settings
         shell: bash
         run: |
           set -euo pipefail
           sed -i 's/"-cpu", "max"/"-cpu", "qemu64"/g' app/src/main/java/sylirre/vmconsole/TerminalActivity.java app/src/main/java/sylirre/vmconsole/EnhancedTerminalActivity.java
+          sed -i 's/new Intent(this, TerminalActivity.class)/new Intent(this, EnhancedTerminalActivity.class)/g' app/src/main/java/sylirre/vmconsole/TerminalService.java
           grep -R '"-cpu", "qemu64"' app/src/main/java/sylirre/vmconsole/TerminalActivity.java app/src/main/java/sylirre/vmconsole/EnhancedTerminalActivity.java
+          grep -R 'EnhancedTerminalActivity.class' app/src/main/java/sylirre/vmconsole/TerminalService.java
 
       - name: Patch zlib package version for libVMC
         working-directory: external/libvmc/packages/zlib
