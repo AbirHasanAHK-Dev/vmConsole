@@ -12,5 +12,5 @@ profile_vmconsole() {
 	syslinux_timeout="20"
 	syslinux_prompt="1"
 	apkovl="genapkovl-vmconsole.sh"
-	apks="$apks openssh-server"
+	apks="$apks openssh-server e2fsprogs sfdisk syslinux util-linux"
 }
