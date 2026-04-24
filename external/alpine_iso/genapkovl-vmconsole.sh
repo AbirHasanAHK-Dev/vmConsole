@@ -2,12 +2,16 @@
 set -eu
 
 HOSTNAME="$1"
-SERIAL_CMDLINE="console=ttyS0,115200n8 console=tty0 earlycon=uart,io,0x3f8,115200 panic=30"
+ROOT="$(mktemp -d)"
+cleanup() {
+    rm -rf "$ROOT"
+}
+trap cleanup EXIT INT TERM
 
-mkdir -p etc usr/local/sbin etc/profile.d
-printf '%s\n' "$HOSTNAME" > etc/hostname
+mkdir -p "$ROOT/etc" "$ROOT/usr/local/sbin" "$ROOT/etc/profile.d"
+printf '%s\n' "$HOSTNAME" > "$ROOT/etc/hostname"
 
-cat > etc/inittab <<'EOF'
+cat > "$ROOT/etc/inittab" <<'EOF'
 ::sysinit:/sbin/openrc sysinit
 ::wait:/sbin/openrc boot
 ::ctrlaltdel:/sbin/reboot
@@ -16,7 +20,7 @@ cat > etc/inittab <<'EOF'
 ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100
 EOF
 
-cat > etc/motd <<'EOF'
+cat > "$ROOT/etc/motd" <<'EOF'
 Welcome to vmConsole Alpine.
 
 Important for installed systems:
@@ -29,7 +33,7 @@ boot the ISO/live system again, mount the installed root at /mnt, then run the
 same command.
 EOF
 
-cat > etc/profile.d/vmconsole.sh <<'EOF'
+cat > "$ROOT/etc/profile.d/vmconsole.sh" <<'EOF'
 if [ -t 0 ]; then
     echo
     echo "vmConsole hint: after setup-alpine/setup-disk, run: vmconsole-fix-installed-boot /mnt"
@@ -37,7 +41,7 @@ if [ -t 0 ]; then
 fi
 EOF
 
-cat > usr/local/sbin/vmconsole-fix-installed-boot <<'EOF'
+cat > "$ROOT/usr/local/sbin/vmconsole-fix-installed-boot" <<'EOF'
 #!/bin/sh
 set -eu
 
@@ -51,14 +55,6 @@ log() {
 fail() {
     printf '%s\n' "vmconsole-fix-installed-boot: ERROR: $*" >&2
     exit 1
-}
-
-ensure_line() {
-    file="$1"
-    line="$2"
-    mkdir -p "$(dirname "$file")"
-    touch "$file"
-    grep -qxF "$line" "$file" || printf '%s\n' "$line" >> "$file"
 }
 
 set_or_append_var() {
@@ -78,6 +74,7 @@ patch_grub_default() {
     grub_default="$TARGET/etc/default/grub"
     mkdir -p "$(dirname "$grub_default")"
     touch "$grub_default"
+    cp "$grub_default" "$grub_default.vmconsole.bak" 2>/dev/null || true
     set_or_append_var "$grub_default" GRUB_CMDLINE_LINUX_DEFAULT "$SERIAL_CMDLINE"
     set_or_append_var "$grub_default" GRUB_CMDLINE_LINUX "$SERIAL_CMDLINE"
     set_or_append_var "$grub_default" GRUB_TERMINAL "serial console"
@@ -88,7 +85,7 @@ patch_grub_default() {
 patch_grub_cfg_direct() {
     grub_cfg="$TARGET/boot/grub/grub.cfg"
     [ -f "$grub_cfg" ] || return 0
-    cp "$grub_cfg" "$grub_cfg.vmconsole.bak" || true
+    cp "$grub_cfg" "$grub_cfg.vmconsole.bak" 2>/dev/null || true
     if ! grep -q "console=ttyS0" "$grub_cfg"; then
         sed -i "/^[[:space:]]*linux[[:space:]]/ s|$| $SERIAL_CMDLINE|" "$grub_cfg"
     fi
@@ -107,7 +104,7 @@ patch_grub_cfg_direct() {
 patch_extlinux() {
     update_conf="$TARGET/etc/update-extlinux.conf"
     if [ -f "$update_conf" ]; then
-        cp "$update_conf" "$update_conf.vmconsole.bak" || true
+        cp "$update_conf" "$update_conf.vmconsole.bak" 2>/dev/null || true
         if grep -q '^default_kernel_opts=' "$update_conf"; then
             sed -i "s|^default_kernel_opts=.*|default_kernel_opts=\"$SERIAL_CMDLINE\"|" "$update_conf"
         else
@@ -117,7 +114,7 @@ patch_extlinux() {
 
     extlinux_cfg="$TARGET/boot/extlinux.conf"
     if [ -f "$extlinux_cfg" ]; then
-        cp "$extlinux_cfg" "$extlinux_cfg.vmconsole.bak" || true
+        cp "$extlinux_cfg" "$extlinux_cfg.vmconsole.bak" 2>/dev/null || true
         if ! grep -q "console=ttyS0" "$extlinux_cfg"; then
             sed -i "/^[[:space:]]*append[[:space:]]/ s|$| $SERIAL_CMDLINE|" "$extlinux_cfg"
         fi
@@ -180,4 +177,6 @@ patch_extlinux
 patch_inittab
 log "done. Reboot the VM and boot from disk."
 EOF
-chmod +x usr/local/sbin/vmconsole-fix-installed-boot
+chmod +x "$ROOT/usr/local/sbin/vmconsole-fix-installed-boot"
+
+tar -C "$ROOT" -czf "${HOSTNAME}.apkovl.tar.gz" .
