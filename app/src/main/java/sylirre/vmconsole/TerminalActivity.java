@@ -422,13 +422,25 @@ public final class TerminalActivity extends Activity implements ServiceConnectio
         processArgs.addAll(Arrays.asList("-cpu", "max"));
 
         // Emulate SMP.
-        processArgs.addAll(Arrays.asList("-smp", "cpus=4,cores=1,threads=1"));
+        int cpus = mSettings.isVmConfigAuto()
+            ? 4
+            : Math.max(1, Math.min(mSettings.getVmCpus(), 8));
+        processArgs.addAll(Arrays.asList("-smp", "cpus=" + cpus + ",cores=1,threads=1"));
 
         // Use information about available free memory reported by Android OS to
         // choose appropriate values.
         // mem[0] - tcg buffer size, mem[1] - vm ram buffer size.
-        int[] mem = getSafeMem();
-        processArgs.addAll(Arrays.asList("-accel", "tcg,tb-size=" + mem[0], "-m", String.valueOf(mem[1])));
+        int tcgTbMiB;
+        int ramMiB;
+        if (mSettings.isVmConfigAuto()) {
+            int[] mem = getSafeMem();
+            tcgTbMiB = mem[0];
+            ramMiB = mem[1];
+        } else {
+            tcgTbMiB = Math.max(Config.QEMU_MIN_TCG_BUF, Math.min(mSettings.getVmTcgTbMiB(), Config.QEMU_MAX_TCG_BUF));
+            ramMiB = Math.max(Config.QEMU_MIN_SAFE_RAM, Math.min(mSettings.getVmRamMiB(), Config.QEMU_MAX_SAFE_RAM));
+        }
+        processArgs.addAll(Arrays.asList("-accel", "tcg,tb-size=" + tcgTbMiB, "-m", String.valueOf(ramMiB)));
 
         // Do not create default devices.
         processArgs.add("-nodefaults");

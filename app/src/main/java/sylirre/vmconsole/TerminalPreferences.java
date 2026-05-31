@@ -28,12 +28,19 @@ public class TerminalPreferences {
     public static final String DISPLAY_MODE_TEXT = "text";
     public static final String DISPLAY_MODE_VNC = "vnc";
 
+    public static final String VM_CONFIG_MODE_AUTO = "auto";
+    public static final String VM_CONFIG_MODE_CUSTOM = "custom";
+
     private static final String PREF_SHOW_EXTRA_KEYS = "show_extra_keys";
     private static final String PREF_IGNORE_BELL = "ignore_bell";
     private static final String PREF_DATA_VERSION = "data_version";
     private static final String PREF_DEFAULT_SSH_USER = "default_ssh_user";
     private static final String PREF_DISPLAY_MODE = "display_mode";
     private static final String PREF_CUSTOM_PORT_FORWARDS = "custom_port_forwards";
+    private static final String PREF_VM_CONFIG_MODE = "vm_config_mode";
+    private static final String PREF_VM_CPUS = "vm_cpus";
+    private static final String PREF_VM_RAM_MIB = "vm_ram_mib";
+    private static final String PREF_VM_TCG_TB_MIB = "vm_tcg_tb_mib";
 
     private boolean mShowExtraKeys;
     private boolean mIgnoreBellCharacter;
@@ -41,6 +48,10 @@ public class TerminalPreferences {
     private String mDefaultSshUser;
     private String mDisplayMode;
     private String mCustomPortForwards;
+    private String mVmConfigMode;
+    private int mVmCpus;
+    private int mVmRamMiB;
+    private int mVmTcgTbMiB;
 
     public TerminalPreferences(Context context) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
@@ -50,6 +61,11 @@ public class TerminalPreferences {
         mDefaultSshUser = prefs.getString(PREF_DEFAULT_SSH_USER, "root");
         mDisplayMode = prefs.getString(PREF_DISPLAY_MODE, DISPLAY_MODE_TEXT);
         mCustomPortForwards = prefs.getString(PREF_CUSTOM_PORT_FORWARDS, "");
+        int defaultCpus = Math.min(Runtime.getRuntime().availableProcessors(), 8);
+        mVmConfigMode = prefs.getString(PREF_VM_CONFIG_MODE, VM_CONFIG_MODE_AUTO);
+        mVmCpus = prefs.getInt(PREF_VM_CPUS, defaultCpus);
+        mVmRamMiB = prefs.getInt(PREF_VM_RAM_MIB, Config.QEMU_MAX_SAFE_RAM);
+        mVmTcgTbMiB = prefs.getInt(PREF_VM_TCG_TB_MIB, Config.QEMU_MAX_TCG_BUF);
     }
 
     public boolean isExtraKeysEnabled() {
@@ -119,5 +135,49 @@ public class TerminalPreferences {
 
     public ArrayList<PortForward> getCustomPortForwards() {
         return PortForward.parseUserConfig(mCustomPortForwards);
+    }
+
+    public String getVmConfigMode() {
+        return mVmConfigMode;
+    }
+
+    public boolean isVmConfigAuto() {
+        return VM_CONFIG_MODE_AUTO.equals(mVmConfigMode);
+    }
+
+    public int getVmCpus() {
+        return mVmCpus;
+    }
+
+    public int getVmRamMiB() {
+        return mVmRamMiB;
+    }
+
+    public int getVmTcgTbMiB() {
+        return mVmTcgTbMiB;
+    }
+
+    public void setVmConfigMode(Context context, String mode) {
+        mVmConfigMode = VM_CONFIG_MODE_CUSTOM.equals(mode) ? VM_CONFIG_MODE_CUSTOM : VM_CONFIG_MODE_AUTO;
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+            .putString(PREF_VM_CONFIG_MODE, mVmConfigMode).apply();
+    }
+
+    public void setVmCpus(Context context, int cpus) {
+        mVmCpus = cpus;
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+            .putInt(PREF_VM_CPUS, cpus).apply();
+    }
+
+    public void setVmRamMiB(Context context, int ramMiB) {
+        mVmRamMiB = ramMiB;
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+            .putInt(PREF_VM_RAM_MIB, ramMiB).apply();
+    }
+
+    public void setVmTcgTbMiB(Context context, int tbMiB) {
+        mVmTcgTbMiB = tbMiB;
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+            .putInt(PREF_VM_TCG_TB_MIB, tbMiB).apply();
     }
 }

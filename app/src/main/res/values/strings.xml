@@ -23,6 +23,7 @@
     <string name="menu_show_ports">Show current ports</string>
     <string name="menu_configure_ports">Configure ports</string>
     <string name="menu_configure_display">Display mode</string>
+    <string name="menu_configure_vm">VM configuration</string>
     <string name="menu_autofill_pw">Autofill password</string>
     <string name="menu_autOFILL_PW">Autofill password</string>
     <string name="menu_select_urls">Select URLs</string>
@@ -34,10 +35,17 @@
     <string name="dialog_set_ssh_user_invalid_name">Cannot use the given SSH user name.</string>
     <string name="dialog_port_config_title">Custom port forwards</string>
     <string name="dialog_display_mode_title">Display mode</string>
+    <string name="dialog_vm_config_title">VM configuration</string>
     <string name="dialog_ports_format_hint">Use comma-separated values. Examples: 8080, 3306, 8081:80</string>
     <string name="dialog_display_mode_hint">Text mode keeps the current serial console. VNC enables graphical output and exposes a local VNC endpoint.</string>
     <string name="dialog_display_mode_text">Text console only</string>
     <string name="dialog_display_mode_vnc">Enable VNC graphical output</string>
+    <string name="dialog_vm_config_hint">Auto mode chooses safe defaults based on available memory. Custom mode lets you override CPUs, guest RAM, and TCG cache size.</string>
+    <string name="dialog_vm_config_auto">Auto (recommended)</string>
+    <string name="dialog_vm_config_custom">Custom</string>
+    <string name="dialog_vm_config_cpus">vCPUs</string>
+    <string name="dialog_vm_config_ram">Guest RAM (MiB)</string>
+    <string name="dialog_vm_config_tcg_tb">TCG tb-size (MiB)</string>
     <string name="dialog_current_ports_title">Current runtime ports</string>
     <string name="dialog_runtime_warning_title">Runtime warning</string>
     <string name="dialog_runtime_warning_no_output">The VM started but no boot output appeared in the terminal. The guest may not be exposing a serial console, or the runtime ISO may not match vmConsole’s expected boot flow.</string>
@@ -51,6 +59,10 @@
     <string name="toast_open_vnc_unavailable">Cannot use this function because VNC is unavailable.</string>
     <string name="toast_ports_saved">Port settings saved. Restart the VM to apply them.</string>
     <string name="toast_display_mode_saved">Display mode saved. Restart the VM to apply it.</string>
+    <string name="toast_vm_config_saved">VM settings saved. Restart the VM to apply them.</string>
+    <string name="toast_vm_config_invalid_cpus">Invalid CPU count. Use a value between 1 and 8.</string>
+    <string name="toast_vm_config_invalid_ram">Invalid guest RAM. Use a value between 1024 and 4096 MiB.</string>
+    <string name="toast_vm_config_invalid_tcg">Invalid TCG tb-size. Use a value between 512 and 1024 MiB.</string>
     <string name="toast_copied_to_clipboard">Copied to clipboard.</string>
 
     <string name="toast_no_urls_found">No URLs detected.</string>

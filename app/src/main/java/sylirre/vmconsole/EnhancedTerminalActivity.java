@@ -65,6 +65,7 @@ public final class EnhancedTerminalActivity extends Activity implements ServiceC
     private static final int MENU_RESET_TERMINAL = 110;
     private static final int MENU_SHUTDOWN = 111;
     private static final int MENU_TOGGLE_IGNORE_BELL = 112;
+    private static final int MENU_CONFIGURE_VM = 113;
 
     private static int currentFontSize = -1;
 
@@ -313,10 +314,22 @@ public final class EnhancedTerminalActivity extends Activity implements ServiceC
         processArgs.add("QEMU");
         processArgs.addAll(Arrays.asList("-L", runtimeDataPath));
         processArgs.addAll(Arrays.asList("-cpu", "max"));
-        processArgs.addAll(Arrays.asList("-smp", "cpus=4,cores=1,threads=1"));
+        int cpus = mSettings.isVmConfigAuto()
+            ? 4
+            : Math.max(1, Math.min(mSettings.getVmCpus(), 8));
+        processArgs.addAll(Arrays.asList("-smp", "cpus=" + cpus + ",cores=1,threads=1"));
 
-        int[] mem = getSafeMem();
-        processArgs.addAll(Arrays.asList("-accel", "tcg,tb-size=" + mem[0], "-m", String.valueOf(mem[1])));
+        int tcgTbMiB;
+        int ramMiB;
+        if (mSettings.isVmConfigAuto()) {
+            int[] mem = getSafeMem();
+            tcgTbMiB = mem[0];
+            ramMiB = mem[1];
+        } else {
+            tcgTbMiB = Math.max(Config.QEMU_MIN_TCG_BUF, Math.min(mSettings.getVmTcgTbMiB(), Config.QEMU_MAX_TCG_BUF));
+            ramMiB = Math.max(Config.QEMU_MIN_SAFE_RAM, Math.min(mSettings.getVmRamMiB(), Config.QEMU_MAX_SAFE_RAM));
+        }
+        processArgs.addAll(Arrays.asList("-accel", "tcg,tb-size=" + tcgTbMiB, "-m", String.valueOf(ramMiB)));
         processArgs.add("-nodefaults");
 
         processArgs.addAll(Arrays.asList("-drive", "file=" + runtimeDataPath + "/" + Config.CDROM_IMAGE_NAME + ",if=none,media=cdrom,index=0,id=cd0"));
@@ -419,6 +432,7 @@ public final class EnhancedTerminalActivity extends Activity implements ServiceC
             menu.add(Menu.NONE, MENU_SHOW_PORTS, Menu.NONE, R.string.menu_show_ports);
             menu.add(Menu.NONE, MENU_CONFIGURE_PORTS, Menu.NONE, R.string.menu_configure_ports);
             menu.add(Menu.NONE, MENU_CONFIGURE_DISPLAY, Menu.NONE, R.string.menu_configure_display);
+            menu.add(Menu.NONE, MENU_CONFIGURE_VM, Menu.NONE, R.string.menu_configure_vm);
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -462,6 +476,9 @@ public final class EnhancedTerminalActivity extends Activity implements ServiceC
                 return true;
             case MENU_CONFIGURE_DISPLAY:
                 showDisplayConfigurationDialog();
+                return true;
+            case MENU_CONFIGURE_VM:
+                showVmConfigurationDialog();
                 return true;
             case MENU_AUTOFILL_PW:
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -643,6 +660,93 @@ public final class EnhancedTerminalActivity extends Activity implements ServiceC
             })
             .setNegativeButton(R.string.cancel_label, null)
             .show();
+    }
+
+    private void showVmConfigurationDialog() {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_vm_config, null);
+        RadioGroup group = dialogView.findViewById(R.id.vm_config_mode_group);
+        RadioButton radioAuto = dialogView.findViewById(R.id.radio_vm_config_auto);
+        RadioButton radioCustom = dialogView.findViewById(R.id.radio_vm_config_custom);
+        EditText cpusInput = dialogView.findViewById(R.id.vm_config_cpus);
+        EditText ramInput = dialogView.findViewById(R.id.vm_config_ram_mib);
+        EditText tbInput = dialogView.findViewById(R.id.vm_config_tcg_tb_mib);
+
+        cpusInput.setText(String.valueOf(mSettings.getVmCpus()));
+        ramInput.setText(String.valueOf(mSettings.getVmRamMiB()));
+        tbInput.setText(String.valueOf(mSettings.getVmTcgTbMiB()));
+
+        boolean isAuto = mSettings.isVmConfigAuto();
+        if (isAuto) {
+            radioAuto.setChecked(true);
+        } else {
+            radioCustom.setChecked(true);
+        }
+
+        View customFields = dialogView.findViewById(R.id.vm_config_custom_fields);
+        customFields.setEnabled(!isAuto);
+        cpusInput.setEnabled(!isAuto);
+        ramInput.setEnabled(!isAuto);
+        tbInput.setEnabled(!isAuto);
+
+        group.setOnCheckedChangeListener((g, checkedId) -> {
+            boolean customEnabled = checkedId == R.id.radio_vm_config_custom;
+            customFields.setEnabled(customEnabled);
+            cpusInput.setEnabled(customEnabled);
+            ramInput.setEnabled(customEnabled);
+            tbInput.setEnabled(customEnabled);
+        });
+
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.dialog_vm_config_title)
+            .setView(dialogView)
+            .setPositiveButton(R.string.ok_label, (dialog, which) -> {
+                boolean customEnabled = group.getCheckedRadioButtonId() == R.id.radio_vm_config_custom;
+                if (!customEnabled) {
+                    mSettings.setVmConfigMode(this, TerminalPreferences.VM_CONFIG_MODE_AUTO);
+                    Toast.makeText(this, R.string.toast_vm_config_saved, Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                Integer cpus = tryParseInt(cpusInput.getText().toString());
+                Integer ramMiB = tryParseInt(ramInput.getText().toString());
+                Integer tbMiB = tryParseInt(tbInput.getText().toString());
+
+                if (cpus == null || cpus < 1 || cpus > 8) {
+                    Toast.makeText(this, R.string.toast_vm_config_invalid_cpus, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (ramMiB == null || ramMiB < Config.QEMU_MIN_SAFE_RAM || ramMiB > Config.QEMU_MAX_SAFE_RAM) {
+                    Toast.makeText(this, R.string.toast_vm_config_invalid_ram, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (tbMiB == null || tbMiB < Config.QEMU_MIN_TCG_BUF || tbMiB > Config.QEMU_MAX_TCG_BUF) {
+                    Toast.makeText(this, R.string.toast_vm_config_invalid_tcg, Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                mSettings.setVmConfigMode(this, TerminalPreferences.VM_CONFIG_MODE_CUSTOM);
+                mSettings.setVmCpus(this, cpus);
+                mSettings.setVmRamMiB(this, ramMiB);
+                mSettings.setVmTcgTbMiB(this, tbMiB);
+                Toast.makeText(this, R.string.toast_vm_config_saved, Toast.LENGTH_LONG).show();
+            })
+            .setNegativeButton(R.string.cancel_label, null)
+            .show();
+    }
+
+    private Integer tryParseInt(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(normalized);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public void doPaste() {
