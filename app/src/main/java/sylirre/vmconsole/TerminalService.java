@@ -261,7 +261,7 @@ public class TerminalService extends Service implements SessionChangedCallback {
     }
 
     private Notification buildNotification() {
-        Intent notifyIntent = new Intent(this, TerminalActivity.class);
+        Intent notifyIntent = new Intent(this, EnhancedTerminalActivity.class);
         notifyIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         PendingIntent pendingIntent = PendingIntent.getActivity(
             this,

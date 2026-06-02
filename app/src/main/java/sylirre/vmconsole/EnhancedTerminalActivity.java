@@ -313,7 +313,7 @@ public final class EnhancedTerminalActivity extends Activity implements ServiceC
         ArrayList<String> processArgs = new ArrayList<>();
         processArgs.add("QEMU");
         processArgs.addAll(Arrays.asList("-L", runtimeDataPath));
-        processArgs.addAll(Arrays.asList("-cpu", "max"));
+        processArgs.addAll(Arrays.asList("-cpu", "qemu64"));
         int cpus = mSettings.isVmConfigAuto()
             ? 4
             : Math.max(1, Math.min(mSettings.getVmCpus(), 8));

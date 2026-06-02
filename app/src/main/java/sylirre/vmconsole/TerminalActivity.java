@@ -419,7 +419,7 @@ public final class TerminalActivity extends Activity implements ServiceConnectio
         processArgs.addAll(Arrays.asList("-L", runtimeDataPath));
 
         // Emulate CPU with max feature set.
-        processArgs.addAll(Arrays.asList("-cpu", "max"));
+        processArgs.addAll(Arrays.asList("-cpu", "qemu64"));
 
         // Emulate SMP.
         int cpus = mSettings.isVmConfigAuto()
